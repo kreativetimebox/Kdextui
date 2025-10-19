@@ -1,24 +1,49 @@
 "use client";
 
 import Link from "next/link";
-import { Brain, HomeIcon, BookOpen, DollarSign, Mail, Info, LayoutDashboard } from "lucide-react";
+import { Brain, HomeIcon, BookOpen, DollarSign, Mail, Info, LayoutDashboard, HelpCircle, Activity, ChevronDown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useState } from "react";
 
 interface NavigationProps {
-  currentPage?: 'home' | 'docs' | 'pricing' | 'contact' | 'about' | 'dashboard';
+  currentPage?: 'home' | 'docs' | 'pricing' | 'contact' | 'about' | 'dashboard' | 'help' | 'status';
 }
 
 export default function Navigation({ currentPage = 'home' }: NavigationProps) {
   const { isAuthenticated, user } = useAuth();
+  const [showResourcesMenu, setShowResourcesMenu] = useState(false);
+  const [closeTimeout, setCloseTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = () => {
+    if (closeTimeout) {
+      clearTimeout(closeTimeout);
+      setCloseTimeout(null);
+    }
+    setShowResourcesMenu(true);
+  };
+
+  const handleMouseLeave = () => {
+    const timeout = setTimeout(() => {
+      setShowResourcesMenu(false);
+    }, 200);
+    setCloseTimeout(timeout);
+  };
 
   const navItems = [
     { href: '/', label: 'Home', icon: HomeIcon, key: 'home' },
     { href: '/docs', label: 'Documentation', icon: BookOpen, key: 'docs' },
     { href: '/pricing', label: 'Pricing', icon: DollarSign, key: 'pricing' },
     ...(isAuthenticated ? [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' }] : []),
-    { href: '/contact', label: 'Contact', icon: Mail, key: 'contact' },
-    { href: '/about', label: 'About', icon: Info, key: 'about' },
   ];
+
+  const resourceItems = [
+    { href: '/help', label: 'Help Center', icon: HelpCircle, key: 'help' },
+    { href: '/status', label: 'System Status', icon: Activity, key: 'status' },
+    { href: '/about', label: 'About Us', icon: Info, key: 'about' },
+    { href: '/contact', label: 'Contact', icon: Mail, key: 'contact' },
+  ];
+
+  const isResourceActive = ['help', 'status', 'about', 'contact'].includes(currentPage);
 
   return (
     <nav className="bg-white/80 backdrop-blur-md border-b border-purple-100 sticky top-0 z-50">
@@ -51,6 +76,55 @@ export default function Navigation({ currentPage = 'home' }: NavigationProps) {
                 </Link>
               );
             })}
+            
+            {/* Resources Dropdown */}
+            <div 
+              className="relative"
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+            >
+              <button
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
+                  isResourceActive
+                    ? 'text-white bg-purple-600 font-semibold'
+                    : 'text-gray-700 hover:text-purple-600 hover:bg-purple-50'
+                }`}
+              >
+                <Info className="h-4 w-4" />
+                Resources
+                <ChevronDown className={`h-4 w-4 transition-transform ${showResourcesMenu ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {showResourcesMenu && (
+                <div 
+                  className="absolute top-full left-0 pt-1 w-56 z-50"
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  <div className="bg-white rounded-lg shadow-xl border border-gray-100 py-2">
+                    {resourceItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = currentPage === item.key;
+                      
+                      return (
+                        <Link
+                          key={item.key}
+                          href={item.href}
+                          className={`flex items-center gap-3 px-4 py-3 text-sm transition-colors ${
+                            isActive
+                              ? 'bg-purple-50 text-purple-600 font-semibold'
+                              : 'text-gray-700 hover:bg-purple-50 hover:text-purple-600'
+                          }`}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {item.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center space-x-3">

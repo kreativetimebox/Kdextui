@@ -293,116 +293,131 @@ export default function PricingPage() {
       </section>
 
       {/* Features Comparison */}
-      <section className="bg-white py-20">
+      <section className="bg-gradient-to-br from-purple-50 via-white to-purple-50 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            <div className="inline-block mb-4 px-4 py-2 bg-purple-100 rounded-full">
+              <span className="text-purple-700 font-semibold text-sm">Detailed Comparison</span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">
               Compare Plans
             </h2>
-            <p className="text-xl text-gray-600">
-              See what&apos;s included in each plan
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Find the perfect plan for your business needs
             </p>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+          <div className="overflow-x-auto shadow-2xl rounded-2xl">
+            <table className="w-full border-collapse bg-white">
               <thead>
-                <tr className="border-b-2 border-gray-200">
-                  <th className="text-left py-4 px-6 font-semibold text-gray-900">Features</th>
-                  <th className="text-center py-4 px-6">
-                    <div className="font-semibold text-gray-900">Free</div>
-                    <div className="text-sm font-normal text-gray-600">$0/month</div>
+                <tr className="bg-gradient-to-r from-purple-600 to-purple-700">
+                  <th className="text-left py-6 px-6 font-bold text-white text-lg rounded-tl-2xl">Features</th>
+                  <th className="text-center py-6 px-6 rounded-tr-2xl md:rounded-tr-none">
+                    <div className="font-bold text-white text-lg">Free</div>
+                    <div className="text-sm font-normal text-purple-100 mt-1">$0/month</div>
                   </th>
-                  <th className="text-center py-4 px-6">
-                    <div className="font-semibold text-purple-600">Pro</div>
-                    <div className="text-sm font-normal text-gray-600">
-                      ${isAnnual ? '39' : '49'}/{isAnnual ? 'month' : 'month'}
+                  <th className="text-center py-6 px-6 bg-purple-800 relative md:rounded-tr-none">
+                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                      <span className="bg-gradient-to-r from-yellow-400 to-orange-400 text-purple-900 text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                        POPULAR
+                      </span>
+                    </div>
+                    <div className="font-bold text-white text-lg mt-2">Pro</div>
+                    <div className="text-sm font-normal text-purple-100 mt-1">
+                      ${isAnnual ? '39' : '49'}/month
                     </div>
                     {isAnnual && (
-                      <div className="text-xs text-green-600">Save 20%</div>
+                      <div className="text-xs text-green-300 font-semibold mt-1">Save 20%</div>
                     )}
                   </th>
-                  <th className="text-center py-4 px-6">
-                    <div className="font-semibold text-gray-900">Business</div>
-                    <div className="text-sm font-normal text-gray-600">
-                      ${isAnnual ? '79' : '99'}/{isAnnual ? 'month' : 'month'}
+                  <th className="text-center py-6 px-6">
+                    <div className="font-bold text-white text-lg">Business</div>
+                    <div className="text-sm font-normal text-purple-100 mt-1">
+                      ${isAnnual ? '79' : '99'}/month
                     </div>
                     {isAnnual && (
-                      <div className="text-xs text-green-600">Save 20%</div>
+                      <div className="text-xs text-green-300 font-semibold mt-1">Save 20%</div>
                     )}
                   </th>
-                  <th className="text-center py-4 px-6">
-                    <div className="font-semibold text-gray-900">Enterprise</div>
-                    <div className="text-sm font-normal text-gray-600">Custom</div>
+                  <th className="text-center py-6 px-6 md:rounded-tr-2xl">
+                    <div className="font-bold text-white text-lg">Enterprise</div>
+                    <div className="text-sm font-normal text-purple-100 mt-1">Custom</div>
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                <tr>
-                  <td className="py-4 px-6 font-medium text-gray-900">Documents per month</td>
-                  <td className="py-4 px-6 text-center text-gray-600">100</td>
-                  <td className="py-4 px-6 text-center text-gray-600">5,000</td>
-                  <td className="py-4 px-6 text-center text-gray-600">15,000</td>
-                  <td className="py-4 px-6 text-center text-gray-600">Unlimited</td>
+              <tbody className="divide-y divide-gray-100">
+                <tr className="hover:bg-purple-50 transition-colors">
+                  <td className="py-5 px-6 font-semibold text-gray-900">Documents per month</td>
+                  <td className="py-5 px-6 text-center text-gray-700 font-medium">100</td>
+                  <td className="py-5 px-6 text-center bg-purple-50 text-purple-900 font-bold">5,000</td>
+                  <td className="py-5 px-6 text-center text-gray-700 font-medium">15,000</td>
+                  <td className="py-5 px-6 text-center text-gray-700 font-medium">Unlimited</td>
                 </tr>
-                <tr className="bg-gray-50">
-                  <td className="py-4 px-6 font-medium text-gray-900">API Rate Limit</td>
-                  <td className="py-4 px-6 text-center text-gray-600">5/min</td>
-                  <td className="py-4 px-6 text-center text-gray-600">50/min</td>
-                  <td className="py-4 px-6 text-center text-gray-600">100/min</td>
-                  <td className="py-4 px-6 text-center text-gray-600">Custom</td>
+                <tr className="hover:bg-purple-50 transition-colors">
+                  <td className="py-5 px-6 font-semibold text-gray-900">API Rate Limit</td>
+                  <td className="py-5 px-6 text-center text-gray-700 font-medium">5/min</td>
+                  <td className="py-5 px-6 text-center bg-purple-50 text-purple-900 font-bold">50/min</td>
+                  <td className="py-5 px-6 text-center text-gray-700 font-medium">100/min</td>
+                  <td className="py-5 px-6 text-center text-gray-700 font-medium">Custom</td>
                 </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium text-gray-900">Bank Statements</td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
+                <tr className="hover:bg-purple-50 transition-colors">
+                  <td className="py-5 px-6 font-semibold text-gray-900">Bank Statements</td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
+                  <td className="py-5 px-6 text-center bg-purple-50"><Check className="h-6 w-6 text-purple-600 mx-auto" /></td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
                 </tr>
-                <tr className="bg-gray-50">
-                  <td className="py-4 px-6 font-medium text-gray-900">Receipts & Invoices</td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
+                <tr className="hover:bg-purple-50 transition-colors">
+                  <td className="py-5 px-6 font-semibold text-gray-900">Receipts & Invoices</td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
+                  <td className="py-5 px-6 text-center bg-purple-50"><Check className="h-6 w-6 text-purple-600 mx-auto" /></td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
                 </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium text-gray-900">Advanced Analytics</td>
-                  <td className="py-4 px-6 text-center text-gray-400">-</td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
+                <tr className="hover:bg-purple-50 transition-colors">
+                  <td className="py-5 px-6 font-semibold text-gray-900">Advanced Analytics</td>
+                  <td className="py-5 px-6 text-center"><span className="text-gray-300 font-bold text-xl">×</span></td>
+                  <td className="py-5 px-6 text-center bg-purple-50"><Check className="h-6 w-6 text-purple-600 mx-auto" /></td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
                 </tr>
-                <tr className="bg-gray-50">
-                  <td className="py-4 px-6 font-medium text-gray-900">Webhook Notifications</td>
-                  <td className="py-4 px-6 text-center text-gray-400">-</td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
+                <tr className="hover:bg-purple-50 transition-colors">
+                  <td className="py-5 px-6 font-semibold text-gray-900">Webhook Notifications</td>
+                  <td className="py-5 px-6 text-center"><span className="text-gray-300 font-bold text-xl">×</span></td>
+                  <td className="py-5 px-6 text-center bg-purple-50"><Check className="h-6 w-6 text-purple-600 mx-auto" /></td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
                 </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium text-gray-900">Custom API Integrations</td>
-                  <td className="py-4 px-6 text-center text-gray-400">-</td>
-                  <td className="py-4 px-6 text-center text-gray-400">-</td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
+                <tr className="hover:bg-purple-50 transition-colors">
+                  <td className="py-5 px-6 font-semibold text-gray-900">Custom API Integrations</td>
+                  <td className="py-5 px-6 text-center"><span className="text-gray-300 font-bold text-xl">×</span></td>
+                  <td className="py-5 px-6 text-center bg-purple-50"><span className="text-gray-300 font-bold text-xl">×</span></td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
                 </tr>
-                <tr className="bg-gray-50">
-                  <td className="py-4 px-6 font-medium text-gray-900">Dedicated Account Manager</td>
-                  <td className="py-4 px-6 text-center text-gray-400">-</td>
-                  <td className="py-4 px-6 text-center text-gray-400">-</td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
+                <tr className="hover:bg-purple-50 transition-colors">
+                  <td className="py-5 px-6 font-semibold text-gray-900">Dedicated Account Manager</td>
+                  <td className="py-5 px-6 text-center"><span className="text-gray-300 font-bold text-xl">×</span></td>
+                  <td className="py-5 px-6 text-center bg-purple-50"><span className="text-gray-300 font-bold text-xl">×</span></td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
+                  <td className="py-5 px-6 text-center"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
                 </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium text-gray-900">SLA Guarantees</td>
-                  <td className="py-4 px-6 text-center text-gray-400">-</td>
-                  <td className="py-4 px-6 text-center text-gray-400">-</td>
-                  <td className="py-4 px-6 text-center text-gray-400">-</td>
-                  <td className="py-4 px-6 text-center"><Check className="h-5 w-5 text-green-500 mx-auto" /></td>
+                <tr className="hover:bg-purple-50 transition-colors">
+                  <td className="py-5 px-6 font-semibold text-gray-900 rounded-bl-2xl">SLA Guarantees</td>
+                  <td className="py-5 px-6 text-center"><span className="text-gray-300 font-bold text-xl">×</span></td>
+                  <td className="py-5 px-6 text-center bg-purple-50"><span className="text-gray-300 font-bold text-xl">×</span></td>
+                  <td className="py-5 px-6 text-center"><span className="text-gray-300 font-bold text-xl">×</span></td>
+                  <td className="py-5 px-6 text-center rounded-br-2xl"><Check className="h-6 w-6 text-green-600 mx-auto" /></td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          {/* CTA under table */}
+          <div className="mt-12 text-center">
+            <p className="text-gray-600 mb-6">
+              Need help choosing the right plan? <Link href="/contact" className="text-purple-600 hover:text-purple-700 font-semibold">Contact our sales team</Link>
+            </p>
           </div>
         </div>
       </section>

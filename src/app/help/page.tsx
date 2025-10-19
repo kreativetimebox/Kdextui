@@ -107,7 +107,7 @@ export default function HelpPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-100">
-      <Navigation currentPage="home" />
+      <Navigation currentPage="help" />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-purple-600 to-purple-800 text-white py-20">
