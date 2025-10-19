@@ -1,68 +1,17 @@
+"use client";
+
 import Link from "next/link";
-import { Brain, ArrowLeft, Shield, Lock, Eye, Users, FileText, Settings, HomeIcon, BookOpen, DollarSign, Mail, Info } from "lucide-react";
+import { Brain, Shield, Lock, Eye, Users, FileText, Settings } from "lucide-react";
+import Navigation from "@/components/Navigation";
 
 export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-100">
-      {/* Navigation */}
-      <nav className="bg-white/80 backdrop-blur-md border-b border-purple-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2 group">
-              <Brain className="h-8 w-8 text-purple-600 group-hover:text-purple-700 transition-colors" />
-              <span className="font-bold text-xl bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent">FinanceAI</span>
-            </Link>
-            <div className="hidden md:flex items-center space-x-1">
-              <Link href="/" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all flex items-center gap-1.5">
-                <HomeIcon className="h-4 w-4" />
-                Home
-              </Link>
-              <Link href="/docs" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all flex items-center gap-1.5">
-                <BookOpen className="h-4 w-4" />
-                Documentation
-              </Link>
-              <Link href="/pricing" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4" />
-                Pricing
-              </Link>
-              <Link href="/contact" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all flex items-center gap-1.5">
-                <Mail className="h-4 w-4" />
-                Contact
-              </Link>
-              <Link href="/about" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all flex items-center gap-1.5">
-                <Info className="h-4 w-4" />
-                About
-              </Link>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Link 
-                href="/login" 
-                className="text-sm font-semibold text-purple-600 hover:text-purple-700 px-4 py-2 rounded-lg hover:bg-purple-50 transition-all"
-              >
-                Sign In
-              </Link>
-              <Link 
-                href="/signup" 
-                className="text-sm font-semibold bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-2 rounded-lg hover:from-purple-700 hover:to-purple-800 shadow-md hover:shadow-lg transform hover:scale-105 transition-all"
-              >
-                Get Started
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navigation currentPage="home" />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         {/* Header */}
         <div className="mb-12">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-700 mb-6"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Home
-          </Link>
-          
           <div className="text-center">
             <div className="w-16 h-16 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-6">
               <Shield className="w-8 h-8 text-purple-600" />

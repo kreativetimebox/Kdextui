@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Brain, Key, FileText, BarChart3, Copy, Eye, EyeOff, Plus, Settings, LayoutDashboard, LogOut } from "lucide-react";
+import DashboardNavigation from "@/components/DashboardNavigation";
 
 interface User {
   id: string;
@@ -53,16 +54,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      router.push('/');
-    } catch (error) {
-      console.error('Logout error:', error);
-      router.push('/');
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-100 flex items-center justify-center">
@@ -78,60 +69,9 @@ export default function DashboardPage() {
     return null;
   }
 
-  const userInitial = user.name.charAt(0).toUpperCase();
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-100">
-            {/* Navigation */}
-      <nav className="bg-white/80 backdrop-blur-md border-b border-purple-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2 group">
-              <Brain className="h-8 w-8 text-purple-600 group-hover:text-purple-700 transition-colors" />
-              <span className="font-bold text-xl bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent">FinanceAI</span>
-            </Link>
-            <div className="hidden md:flex items-center space-x-1">
-              <Link href="/" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all">
-                Home
-              </Link>
-              <Link href="/docs" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all">
-                Documentation
-              </Link>
-              <Link href="/pricing" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all">
-                Pricing
-              </Link>
-              <Link href="/dashboard" className="px-4 py-2 text-sm font-semibold text-white bg-purple-600 rounded-lg transition-all flex items-center gap-1">
-                <LayoutDashboard className="h-4 w-4" />
-                Dashboard
-              </Link>
-              <Link href="/contact" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all">
-                Contact
-              </Link>
-              <Link href="/about" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all">
-                About
-              </Link>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">{userInitial}</span>
-                </div>
-                <div>
-                  <span className="text-gray-700 text-sm font-medium">{user.name}</span>
-                  <span className="block text-xs text-gray-500">{user.email}</span>
-                </div>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="text-sm font-semibold text-red-600 hover:text-red-700 px-4 py-2 rounded-lg hover:bg-red-50 transition-all flex items-center gap-2"
-              >
-                <LogOut className="h-4 w-4" />
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <DashboardNavigation userName={user.name} userEmail={user.email} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
