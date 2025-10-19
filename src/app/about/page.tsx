@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Brain, Users, Target, Award, ArrowRight, Lightbulb, Shield, HomeIcon, BookOpen, DollarSign, Mail, Info } from "lucide-react";
 import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
 
 export default function AboutPage() {
   return (
@@ -247,6 +248,8 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
+
+      <Footer />
     </div>
   );
 }

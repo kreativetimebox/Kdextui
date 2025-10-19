@@ -131,7 +131,7 @@ export default function LoginPage() {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-5 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all hover:border-gray-400 shadow-sm text-lg"
+                className="w-full px-5 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all hover:border-gray-400 shadow-sm text-lg text-gray-900 placeholder:text-gray-400"
                 placeholder="Enter your email"
               />
             </div>
@@ -148,7 +148,7 @@ export default function LoginPage() {
                   required
                   value={formData.password}
                   onChange={handleChange}
-                  className="w-full px-5 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all hover:border-gray-400 pr-14 shadow-sm text-lg"
+                  className="w-full px-5 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all hover:border-gray-400 pr-14 shadow-sm text-lg text-gray-900 placeholder:text-gray-400"
                   placeholder="Enter your password"
                 />
                 <button

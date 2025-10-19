@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Brain, Shield, Lock, Eye, Users, FileText, Settings } from "lucide-react";
 import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -399,6 +400,8 @@ export default function PrivacyPolicyPage() {
           </section>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 }

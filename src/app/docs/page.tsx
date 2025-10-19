@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Brain, Code, FileText, Key, Shield, Zap, HomeIcon, BookOpen, DollarSign, Mail, Info, Rocket, Lock, Terminal, Webhook, Package, CheckCircle, AlertCircle, TrendingUp } from "lucide-react";
 import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
 
 export default function DocsPage() {
   return (
@@ -382,25 +383,25 @@ print(result)`}
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-3">HTTP Status Codes</h3>
                     <div className="space-y-2">
-                      <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                        <code>200</code>
-                        <span className="text-gray-600">Success</span>
+                      <div className="flex justify-between items-center p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
+                        <code className="text-lg font-bold text-green-700 bg-green-200 px-3 py-1 rounded">200</code>
+                        <span className="text-gray-700 font-medium">Success</span>
                       </div>
-                      <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                        <code>400</code>
-                        <span className="text-gray-600">Bad Request</span>
+                      <div className="flex justify-between items-center p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
+                        <code className="text-lg font-bold text-yellow-700 bg-yellow-200 px-3 py-1 rounded">400</code>
+                        <span className="text-gray-700 font-medium">Bad Request</span>
                       </div>
-                      <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                        <code>401</code>
-                        <span className="text-gray-600">Unauthorized</span>
+                      <div className="flex justify-between items-center p-4 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border border-red-200">
+                        <code className="text-lg font-bold text-red-700 bg-red-200 px-3 py-1 rounded">401</code>
+                        <span className="text-gray-700 font-medium">Unauthorized</span>
                       </div>
-                      <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                        <code>429</code>
-                        <span className="text-gray-600">Rate Limited</span>
+                      <div className="flex justify-between items-center p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+                        <code className="text-lg font-bold text-orange-700 bg-orange-200 px-3 py-1 rounded">429</code>
+                        <span className="text-gray-700 font-medium">Rate Limited</span>
                       </div>
-                      <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                        <code>500</code>
-                        <span className="text-gray-600">Server Error</span>
+                      <div className="flex justify-between items-center p-4 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border border-red-200">
+                        <code className="text-lg font-bold text-red-700 bg-red-200 px-3 py-1 rounded">500</code>
+                        <span className="text-gray-700 font-medium">Server Error</span>
                       </div>
                     </div>
                   </div>
@@ -611,6 +612,8 @@ print(result)`}
           </div>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 }

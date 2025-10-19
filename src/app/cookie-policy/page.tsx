@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Brain, Cookie, Settings, Eye } from "lucide-react";
 import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
 
 export default function CookiePolicyPage() {
   return (
@@ -257,6 +258,8 @@ export default function CookiePolicyPage() {
           </Link>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 }
