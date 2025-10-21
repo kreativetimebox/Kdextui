@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Brain, HomeIcon, BookOpen, DollarSign, Mail, Info, LayoutDashboard, LogOut, User } from "lucide-react";
+import { Brain, HomeIcon, BookOpen, DollarSign, Mail, Info, LayoutDashboard, LogOut, User, HelpCircle, Activity, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
 
 interface DashboardNavigationProps {
   userName: string;
@@ -11,6 +12,30 @@ interface DashboardNavigationProps {
 
 export default function DashboardNavigation({ userName, userEmail }: DashboardNavigationProps) {
   const router = useRouter();
+  const [showResourcesMenu, setShowResourcesMenu] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowResourcesMenu(false);
+      }
+    };
+
+    if (showResourcesMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showResourcesMenu]);
+
+  const toggleResourcesMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowResourcesMenu(!showResourcesMenu);
+  };
 
   const handleLogout = async () => {
     try {
@@ -27,8 +52,13 @@ export default function DashboardNavigation({ userName, userEmail }: DashboardNa
     { href: '/docs', label: 'Documentation', icon: BookOpen },
     { href: '/pricing', label: 'Pricing', icon: DollarSign },
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, isActive: true },
+  ];
+
+  const resourceItems = [
+    { href: '/help', label: 'Help Center', icon: HelpCircle },
+    { href: '/status', label: 'System Status', icon: Activity },
+    { href: '/about', label: 'About Us', icon: Info },
     { href: '/contact', label: 'Contact', icon: Mail },
-    { href: '/about', label: 'About', icon: Info },
   ];
 
   const userInitial = userName.charAt(0).toUpperCase();
@@ -64,6 +94,48 @@ export default function DashboardNavigation({ userName, userEmail }: DashboardNa
                 </Link>
               );
             })}
+
+            {/* Resources Dropdown */}
+            <div 
+              ref={dropdownRef}
+              className="relative"
+            >
+              <button
+                onClick={toggleResourcesMenu}
+                className="px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 text-gray-700 hover:text-purple-600 hover:bg-purple-50"
+              >
+                <Info className="h-4 w-4" />
+                Resources
+                <ChevronDown className={`h-4 w-4 transition-transform ${showResourcesMenu ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {showResourcesMenu && (
+                <div 
+                  className="absolute top-full left-0 mt-2 w-56 z-50"
+                >
+                  <div className="bg-white rounded-lg shadow-xl border border-gray-100 py-2">
+                    {resourceItems.map((item) => {
+                      const Icon = item.icon;
+                      
+                      return (
+                        <Link
+                          key={item.label}
+                          href={item.href}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowResourcesMenu(false);
+                          }}
+                          className="flex items-center gap-3 px-4 py-3 text-sm transition-colors text-gray-700 hover:bg-purple-50 hover:text-purple-600"
+                        >
+                          <Icon className="h-4 w-4" />
+                          {item.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center space-x-2">

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Brain, HomeIcon, BookOpen, DollarSign, Mail, Info, LayoutDashboard, HelpCircle, Activity, ChevronDown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface NavigationProps {
   currentPage?: 'home' | 'docs' | 'pricing' | 'contact' | 'about' | 'dashboard' | 'help' | 'status';
@@ -12,21 +12,28 @@ interface NavigationProps {
 export default function Navigation({ currentPage = 'home' }: NavigationProps) {
   const { isAuthenticated, user } = useAuth();
   const [showResourcesMenu, setShowResourcesMenu] = useState(false);
-  const [closeTimeout, setCloseTimeout] = useState<NodeJS.Timeout | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const handleMouseEnter = () => {
-    if (closeTimeout) {
-      clearTimeout(closeTimeout);
-      setCloseTimeout(null);
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowResourcesMenu(false);
+      }
+    };
+
+    if (showResourcesMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
     }
-    setShowResourcesMenu(true);
-  };
 
-  const handleMouseLeave = () => {
-    const timeout = setTimeout(() => {
-      setShowResourcesMenu(false);
-    }, 200);
-    setCloseTimeout(timeout);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showResourcesMenu]);
+
+  const toggleResourcesMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowResourcesMenu(!showResourcesMenu);
   };
 
   const navItems = [
@@ -79,11 +86,11 @@ export default function Navigation({ currentPage = 'home' }: NavigationProps) {
             
             {/* Resources Dropdown */}
             <div 
+              ref={dropdownRef}
               className="relative"
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={handleMouseLeave}
             >
               <button
+                onClick={toggleResourcesMenu}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
                   isResourceActive
                     ? 'text-white bg-purple-600 font-semibold'
@@ -97,9 +104,7 @@ export default function Navigation({ currentPage = 'home' }: NavigationProps) {
               
               {showResourcesMenu && (
                 <div 
-                  className="absolute top-full left-0 pt-1 w-56 z-50"
-                  onMouseEnter={handleMouseEnter}
-                  onMouseLeave={handleMouseLeave}
+                  className="absolute top-full left-0 mt-2 w-56 z-50"
                 >
                   <div className="bg-white rounded-lg shadow-xl border border-gray-100 py-2">
                     {resourceItems.map((item) => {
@@ -110,6 +115,10 @@ export default function Navigation({ currentPage = 'home' }: NavigationProps) {
                         <Link
                           key={item.key}
                           href={item.href}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowResourcesMenu(false);
+                          }}
                           className={`flex items-center gap-3 px-4 py-3 text-sm transition-colors ${
                             isActive
                               ? 'bg-purple-50 text-purple-600 font-semibold'
