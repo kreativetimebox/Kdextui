@@ -14,7 +14,7 @@ export default function Navigation({ currentPage = 'home' }: NavigationProps) {
   const [showResourcesMenu, setShowResourcesMenu] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
+  // Close the dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
