@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Brain, HomeIcon, BookOpen, DollarSign, Mail, Info, LayoutDashboard, HelpCircle, Activity, ChevronDown } from "lucide-react";
+import { Brain, HomeIcon, BookOpen, DollarSign, Mail, Info, LayoutDashboard, HelpCircle, Activity, ChevronDown, ScanLine } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useState, useEffect, useRef } from "react";
 
@@ -40,7 +40,10 @@ export default function Navigation({ currentPage = 'home' }: NavigationProps) {
     { href: '/', label: 'Home', icon: HomeIcon, key: 'home' },
     { href: '/docs', label: 'Documentation', icon: BookOpen, key: 'docs' },
     { href: '/pricing', label: 'Pricing', icon: DollarSign, key: 'pricing' },
-    ...(isAuthenticated ? [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' }] : []),
+    ...(isAuthenticated ? [
+      { href: '/scan', label: 'Scan', icon: ScanLine, key: 'scan' },
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' }
+    ] : []),
   ];
 
   const resourceItems = [
