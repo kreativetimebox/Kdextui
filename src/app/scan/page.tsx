@@ -1,1237 +1,1236 @@
 ﻿'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
+import { FileText, Receipt, Landmark, Upload, Search, Filter, Download, Trash2, Check, Clock, AlertCircle, CheckCircle2, MoreVertical, Tag, Eye, X, Code, Loader2, Image, FileSpreadsheet } from 'lucide-react';
 
-interface UploadProgress {
-  percentage: number;
-  status: 'uploading' | 'processing' | 'extracting' | 'complete' | 'error';
-  message: string;
+type DocumentType = 'invoice' | 'receipt' | 'bank-statement';
+type DocumentStatus = 'pending' | 'processing' | 'verified' | 'completed' | 'flagged';
+
+interface Document {
+  id: string;
+  type: DocumentType;
+  status: DocumentStatus;
+  uploadDate: string;
+  vendor: string;
+  description: string;
+  amount: string;
+  currency: string;
+  confidence?: number;
+  selected: boolean;
+  extractedData?: any; // Full extracted data from API
 }
 
-type UploadMode = 'single' | 'bulk' | 'bank-statement';
-
 export default function ScanPage() {
-  const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadMode, setUploadMode] = useState<UploadMode>('single');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const [progress, setProgress] = useState<UploadProgress>({
-    percentage: 0,
-    status: 'uploading',
-    message: '',
-  });
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'json' | 'table'>('table');
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
-  const [expandedBulkFiles, setExpandedBulkFiles] = useState<Set<number>>(new Set());
-  const [bulkFileViewMode, setBulkFileViewMode] = useState<Map<number, 'json' | 'table'>>(new Map());
+  const [activeTab, setActiveTab] = useState<DocumentStatus>('pending');
+  const [selectedType, setSelectedType] = useState<DocumentType | 'all'>('all');
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [resultView, setResultView] = useState<'table' | 'json'>('table');
+  const [uploadMode, setUploadMode] = useState<'single' | 'bulk' | 'bank-statement'>('single');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const [uploadError, setUploadError] = useState('');
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
-  const acceptedFormats = [
-    '.pdf', '.docx', '.doc', '.txt',
-    '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff',
-    '.xlsx', '.xls', '.csv'
-  ];
+  // Handle file upload
+  const handleFileUpload = async (files: FileList | null, documentType?: DocumentType) => {
+    if (!files || files.length === 0) return;
 
-  const acceptedMimeTypes = [
-    'application/pdf',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/msword',
-    'text/plain',
-    'image/png', 'image/jpeg', 'image/gif', 'image/bmp', 'image/tiff',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-excel',
-    'text/csv'
-  ];
+    setIsUploading(true);
+    setUploadProgress('Uploading...');
 
-  const validateFile = (file: File): boolean => {
-    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!acceptedFormats.includes(fileExtension)) {
-      setError(`Unsupported file format. Please upload: ${acceptedFormats.join(', ')}`);
-      return false;
-    }
-    
-    const maxSize = 50 * 1024 * 1024; // 50MB
-    if (file.size > maxSize) {
-      setError('File size exceeds 50MB limit');
-      return false;
-    }
-    
-    return true;
-  };
-
-  const handleFileSelect = (file: File) => {
-    setError('');
-    setResult(null);
-    
-    if (validateFile(file)) {
-      if (uploadMode === 'bulk') {
-        setSelectedFiles(prev => [...prev, file]);
-      } else {
-        setSelectedFile(file);
-      }
-    }
-  };
-
-  const handleMultipleFileSelect = (files: FileList) => {
-    setError('');
-    setResult(null);
-    
-    const validFiles: File[] = [];
-    Array.from(files).forEach(file => {
-      if (validateFile(file)) {
-        validFiles.push(file);
-      }
-    });
-    
-    if (uploadMode === 'bulk') {
-      setSelectedFiles(prev => [...prev, ...validFiles]);
-    } else if (validFiles.length > 0) {
-      setSelectedFile(validFiles[0]);
-    }
-  };
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      if (uploadMode === 'bulk' && files.length > 1) {
-        handleMultipleFileSelect(files);
-      } else {
-        const file = files[0];
-        if (file) {
-          handleFileSelect(file);
-        }
-      }
-    }
-  };
-
-  const removeFile = (index: number) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      if (uploadMode === 'bulk' && files.length > 1) {
-        handleMultipleFileSelect(files);
-      } else {
-        const file = files[0];
-        if (file) {
-          handleFileSelect(file);
-        }
-      }
-    }
-  }, [uploadMode]);
-
-  const simulateProgress = async (callback: () => Promise<any>) => {
-    setIsProcessing(true);
-    setProgress({ percentage: 0, status: 'uploading', message: 'Uploading document...' });
-
-    // Simulate upload progress
-    for (let i = 0; i <= 30; i += 10) {
-      await new Promise(resolve => setTimeout(resolve, 200));
-      setProgress({ percentage: i, status: 'uploading', message: 'Uploading document...' });
-    }
-
-    setProgress({ percentage: 40, status: 'processing', message: 'Processing document...' });
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    setProgress({ percentage: 60, status: 'extracting', message: 'Extracting data...' });
-    
     try {
-      await callback();
-      
-      setProgress({ percentage: 100, status: 'complete', message: 'Complete!' });
-      await new Promise(resolve => setTimeout(resolve, 500));
-    } catch (err) {
-      setProgress({ percentage: 0, status: 'error', message: 'Failed to process document' });
-      throw err;
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+      const formData = new FormData();
 
-  const handleUpload = async () => {
-    if (uploadMode === 'bulk') {
-      if (selectedFiles.length === 0) return;
-      
-      try {
-        await simulateProgress(async () => {
-          const formData = new FormData();
-          selectedFiles.forEach((file, index) => {
-            formData.append(`file${index}`, file);
-          });
-          formData.append('mode', 'bulk');
-          formData.append('count', selectedFiles.length.toString());
-
-          const response = await fetch('/api/scan', {
-            method: 'POST',
-            body: formData,
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `Upload failed: ${response.statusText}`);
-          }
-
-          const data = await response.json();
-          setResult(data);
-          setError('');
+      if (uploadMode === 'bulk') {
+        // Bulk upload for multiple invoices/receipts
+        formData.append('count', files.length.toString());
+        Array.from(files).forEach((file, index) => {
+          formData.append(`file${index}`, file);
         });
-      } catch (err: any) {
-        setError(err.message || 'Failed to process documents. Please try again.');
-        setResult(null);
-      }
-    } else {
-      if (!selectedFile) return;
 
-      try {
-        await simulateProgress(async () => {
-          const formData = new FormData();
-          formData.append('file', selectedFile);
-          formData.append('mode', uploadMode);
-
-          const response = await fetch('/api/scan', {
-            method: 'POST',
-            body: formData,
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `Upload failed: ${response.statusText}`);
-          }
-
-          const data = await response.json();
-          setResult(data);
-          setError('');
+        setUploadProgress('Processing bulk upload...');
+        const response = await fetch('/api/scan/bulk', {
+          method: 'POST',
+          body: formData,
         });
-      } catch (err: any) {
-        setError(err.message || 'Failed to process document. Please try again.');
-        setResult(null);
-      }
-    }
-  };
 
-  const handleReset = () => {
-    setSelectedFile(null);
-    setSelectedFiles([]);
-    setResult(null);
-    setError('');
-    setProgress({ percentage: 0, status: 'uploading', message: '' });
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const copyToClipboard = () => {
-    if (result) {
-      navigator.clipboard.writeText(JSON.stringify(result, null, 2));
-      alert('JSON copied to clipboard!');
-    }
-  };
-
-  const flattenObject = (obj: any, prefix: string = ''): Record<string, any> => {
-    const flattened: Record<string, any> = {};
-    
-    Object.keys(obj).forEach((key) => {
-      const value = obj[key];
-      const newKey = prefix ? `${prefix}.${key}` : key;
-      
-      if (value === null || value === undefined) {
-        flattened[newKey] = '';
-      } else if (Array.isArray(value)) {
-        if (value.length === 0) {
-          flattened[newKey] = '';
-        } else if (typeof value[0] === 'object' && value[0] !== null) {
-          value.forEach((item, index) => {
-            Object.assign(flattened, flattenObject(item, `${newKey}[${index}]`));
-          });
-        } else {
-          flattened[newKey] = value.join(', ');
-        }
-      } else if (typeof value === 'object') {
-        Object.assign(flattened, flattenObject(value, newKey));
-      } else {
-        flattened[newKey] = value;
-      }
-    });
-    
-    return flattened;
-  };
-
-  const exportToCSV = () => {
-    if (!result) return;
-
-    const flattened = flattenObject(result);
-    const headers = Object.keys(flattened);
-    const values = Object.values(flattened);
-
-    const csvContent = [
-      headers.join(','),
-      values.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', `scan_result_${Date.now()}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const exportToExcel = () => {
-    if (!result) return;
-
-    const flattened = flattenObject(result);
-    
-    // Create HTML table for Excel
-    let html = '<html><head><meta charset="utf-8"></head><body><table border="1">';
-    html += '<thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>';
-    
-    Object.entries(flattened).forEach(([key, value]) => {
-      html += `<tr><td>${key}</td><td>${value}</td></tr>`;
-    });
-    
-    html += '</tbody></table></body></html>';
-
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', `scan_result_${Date.now()}.xls`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const exportFileToCSV = (data: any, filename: string) => {
-    const flattened = flattenObject(data);
-    const headers = Object.keys(flattened);
-    const values = Object.values(flattened);
-
-    const csvContent = [
-      headers.join(','),
-      values.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${filename.replace(/\.[^/.]+$/, '')}_${Date.now()}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const exportFileToExcel = (data: any, filename: string) => {
-    const flattened = flattenObject(data);
-    
-    // Create HTML table for Excel
-    let html = '<html><head><meta charset="utf-8"></head><body><table border="1">';
-    html += '<thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>';
-    
-    Object.entries(flattened).forEach(([key, value]) => {
-      html += `<tr><td>${key}</td><td>${value}</td></tr>`;
-    });
-    
-    html += '</tbody></table></body></html>';
-
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${filename.replace(/\.[^/.]+$/, '')}_${Date.now()}.xls`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const toggleSection = (key: string) => {
-    setExpandedSections(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(key)) {
-        newSet.delete(key);
-      } else {
-        newSet.add(key);
-      }
-      return newSet;
-    });
-  };
-
-  const toggleBulkFile = (index: number) => {
-    setExpandedBulkFiles(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(index)) {
-        newSet.delete(index);
-      } else {
-        newSet.add(index);
-      }
-      return newSet;
-    });
-  };
-
-  const setBulkFileView = (index: number, mode: 'json' | 'table') => {
-    setBulkFileViewMode(prev => {
-      const newMap = new Map(prev);
-      newMap.set(index, mode);
-      return newMap;
-    });
-  };
-
-  const getBulkFileView = (index: number): 'json' | 'table' => {
-    return bulkFileViewMode.get(index) || 'table';
-  };
-
-  const renderJsonValue = (value: any, key: string, level: number = 0): React.ReactElement => {
-    const isExpanded = expandedSections.has(key);
-    const indent = level * 20;
-
-    if (value === null) {
-      return <span className="text-gray-400">null</span>;
-    }
-
-    if (typeof value === 'boolean') {
-      return <span className="text-blue-600">{value.toString()}</span>;
-    }
-
-    if (typeof value === 'number') {
-      return <span className="text-green-600">{value}</span>;
-    }
-
-    if (typeof value === 'string') {
-      return <span className="text-orange-600">&quot;{value}&quot;</span>;
-    }
-
-    if (Array.isArray(value)) {
-      return (
-        <div>
-          <button
-            onClick={() => toggleSection(key)}
-            className="text-purple-600 hover:text-purple-700 font-mono"
-          >
-            {isExpanded ? 'Γû╝' : 'Γû╢'} Array[{value.length}]
-          </button>
-          {isExpanded && (
-            <div style={{ marginLeft: `${indent + 20}px` }} className="border-l-2 border-gray-200 pl-4 mt-2">
-              {value.map((item, index) => (
-                <div key={index} className="mb-2">
-                  <span className="text-gray-500 font-mono">[{index}]: </span>
-                  {renderJsonValue(item, `${key}.${index}`, level + 1)}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (typeof value === 'object') {
-      const entries = Object.entries(value);
-      return (
-        <div>
-          <button
-            onClick={() => toggleSection(key)}
-            className="text-purple-600 hover:text-purple-700 font-mono"
-          >
-            {isExpanded ? 'Γû╝' : 'Γû╢'} Object
-          </button>
-          {isExpanded && (
-            <div style={{ marginLeft: `${indent + 20}px` }} className="border-l-2 border-gray-200 pl-4 mt-2">
-              {entries.map(([k, v]) => (
-                <div key={k} className="mb-2">
-                  <span className="text-blue-700 font-mono">&quot;{k}&quot;: </span>
-                  {renderJsonValue(v, `${key}.${k}`, level + 1)}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    return <span className="text-gray-600">{String(value)}</span>;
-  };
-
-  const renderTableView = (data: any, parentKey: string = ''): React.ReactElement[] => {
-    const rows: React.ReactElement[] = [];
-
-    const renderValue = (value: any, key: string): React.ReactElement => {
-      if (value === null || value === undefined) {
-        return <span className="text-gray-400 italic">null</span>;
-      }
-
-      if (typeof value === 'boolean' || typeof value === 'number') {
-        return <span className="font-medium">{String(value)}</span>;
-      }
-
-      if (typeof value === 'string') {
-        return <span>{value}</span>;
-      }
-
-      if (Array.isArray(value)) {
-        if (value.length === 0) {
-          return <span className="text-gray-400 italic">Empty array</span>;
-        }
+        const result = await response.json();
         
-        if (typeof value[0] === 'object' && value[0] !== null) {
-          return (
-            <div className="space-y-2">
-              {value.map((item, index) => (
-                <div key={index} className="bg-gray-50 p-3 rounded border border-gray-200">
-                  <div className="text-xs font-semibold text-purple-600 mb-2">Item {index + 1}</div>
-                  {Object.entries(item).map(([k, v]) => (
-                    <div key={k} className="flex text-sm mb-1">
-                      <span className="font-medium text-gray-600 mr-2">{k}:</span>
-                      <span className="text-gray-800">{String(v)}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          );
-        }
-        
-        return <span>{value.join(', ')}</span>;
-      }
-
-      if (typeof value === 'object') {
-        return (
-          <div className="bg-gray-50 p-3 rounded border border-gray-200 space-y-1">
-            {Object.entries(value).map(([k, v]) => (
-              <div key={k} className="flex text-sm">
-                <span className="font-medium text-gray-600 mr-2">{k}:</span>
-                <span className="text-gray-800">{String(v)}</span>
-              </div>
-            ))}
-          </div>
-        );
-      }
-
-      return <span>{String(value)}</span>;
-    };
-
-    const processObject = (obj: any, prefix: string = '') => {
-      if (obj === null || obj === undefined) return;
-
-      if (Array.isArray(obj)) {
-        obj.forEach((item, index) => {
-          const key = prefix ? `${prefix}[${index}]` : `Item ${index + 1}`;
-          if (typeof item === 'object' && item !== null) {
-            processObject(item, key);
-          } else {
-            rows.push(
-              <tr key={`${prefix}-${index}`} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                <td className="py-3 px-4 font-medium text-gray-700">{key}</td>
-                <td className="py-3 px-4 text-gray-900">{renderValue(item, key)}</td>
-              </tr>
-            );
-          }
-        });
-      } else if (typeof obj === 'object') {
-        Object.entries(obj).forEach(([key, value]) => {
-          const fullKey = prefix ? `${prefix}.${key}` : key;
+        if (result.success && result.documents) {
+          const newDocuments: Document[] = result.documents.map((doc: any) => ({
+            id: doc.id,
+            type: doc.documentType,
+            status: doc.status,
+            uploadDate: doc.uploadDate,
+            vendor: doc.extractedData.vendor || doc.extractedData.storeName || 'Unknown',
+            description: doc.extractedData.description || `${doc.documentType} document`,
+            amount: doc.extractedData.amount?.toString() || '0.00',
+            currency: doc.extractedData.currency || 'USD',
+            confidence: Math.round(doc.confidence * 100),
+            selected: false,
+            extractedData: doc.extractedData
+          }));
           
-          if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-            rows.push(
-              <tr key={fullKey} className="bg-purple-50 border-b border-purple-100">
-                <td colSpan={2} className="py-2 px-4 font-semibold text-purple-700 text-sm uppercase tracking-wide">
-                  {fullKey}
-                </td>
-              </tr>
-            );
-            processObject(value, fullKey);
-          } else {
-            rows.push(
-              <tr key={fullKey} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                <td className="py-3 px-4 font-medium text-gray-700">{key}</td>
-                <td className="py-3 px-4 text-gray-900">{renderValue(value, fullKey)}</td>
-              </tr>
-            );
-          }
+          setDocuments(prev => [...newDocuments, ...prev]);
+          setUploadProgress(`Successfully uploaded ${files.length} documents`);
+        }
+
+      } else if (uploadMode === 'bank-statement') {
+        // Bank statement upload
+        formData.append('file', files[0]);
+
+        setUploadProgress('Processing bank statement...');
+        const response = await fetch('/api/scan/bank-statement', {
+          method: 'POST',
+          body: formData,
         });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          const newDocument: Document = {
+            id: Date.now().toString(),
+            type: 'bank-statement',
+            status: 'verified',
+            uploadDate: new Date().toISOString().split('T')[0],
+            vendor: result.statementInfo.bank || 'Bank',
+            description: `Account ${result.statementInfo.accountNumber}`,
+            amount: result.accountSummary.closingBalance?.toString() || '0.00',
+            currency: result.accountSummary.currency || 'USD',
+            confidence: Math.round((result.metadata?.confidence || 0.95) * 100),
+            selected: false,
+            extractedData: result
+          };
+          
+          setDocuments(prev => [newDocument, ...prev]);
+          setUploadProgress('Bank statement processed successfully');
+        }
+
+      } else {
+        // Single upload for invoice or receipt
+        formData.append('file', files[0]);
+        formData.append('type', documentType || 'invoice');
+
+        setUploadProgress(`Processing ${documentType}...`);
+        const response = await fetch('/api/scan/single', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          const isInvoice = result.documentType === 'invoice';
+          const extractedData = result.extractedData;
+          
+          const newDocument: Document = {
+            id: Date.now().toString(),
+            type: result.documentType,
+            status: 'pending',
+            uploadDate: new Date().toISOString().split('T')[0],
+            vendor: isInvoice 
+              ? extractedData.vendor?.name || extractedData.vendorInfo?.name || 'Unknown Vendor'
+              : extractedData.storeName || extractedData.documentInfo?.storeName || 'Unknown Store',
+            description: isInvoice
+              ? `Invoice ${extractedData.documentInfo?.documentNumber || extractedData.invoiceNumber || ''}`
+              : `Receipt from ${extractedData.storeName || 'store'}`,
+            amount: (extractedData.financialSummary?.totalAmount || extractedData.total || 0).toString(),
+            currency: extractedData.financialSummary?.currency || extractedData.currency || 'USD',
+            confidence: Math.round((result.extractionMetadata?.confidence || 0.95) * 100),
+            selected: false,
+            extractedData: extractedData
+          };
+          
+          setDocuments(prev => [newDocument, ...prev]);
+          setUploadProgress(`${documentType} processed successfully`);
+        }
       }
-    };
 
-    processObject(data, parentKey);
-    return rows;
-  };
+      setTimeout(() => {
+        setShowUploadModal(false);
+        setIsUploading(false);
+        setUploadProgress('');
+        setUploadError('');
+      }, 2000);
 
-  const getStatusColor = () => {
-    switch (progress.status) {
-      case 'uploading':
-        return 'bg-blue-500';
-      case 'processing':
-        return 'bg-purple-500';
-      case 'extracting':
-        return 'bg-indigo-500';
-      case 'complete':
-        return 'bg-green-500';
-      case 'error':
-        return 'bg-red-500';
-      default:
-        return 'bg-gray-500';
+    } catch (error) {
+      console.error('Upload error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Upload failed. Please try again.';
+      setUploadError(errorMessage);
+      setUploadProgress('');
+      setIsUploading(false);
     }
   };
+
+  const tabs = [
+    { key: 'pending' as DocumentStatus, label: 'Pending Review', count: 18, icon: Clock, color: 'amber' },
+    { key: 'processing' as DocumentStatus, label: 'Processing', count: 5, icon: AlertCircle, color: 'blue' },
+    { key: 'verified' as DocumentStatus, label: 'Verified', count: 12, icon: CheckCircle2, color: 'green' },
+    { key: 'completed' as DocumentStatus, label: 'Completed', count: 24, icon: Check, color: 'emerald' },
+    { key: 'flagged' as DocumentStatus, label: 'Flagged', count: 2, icon: AlertCircle, color: 'red' }
+  ];
+
+  const documentTypes = [
+    { key: 'all' as const, label: 'All Types', icon: FileText, count: documents.length, color: 'purple' },
+    { key: 'invoice' as DocumentType, label: 'Invoices', icon: FileText, count: documents.filter(d => d.type === 'invoice').length, color: 'blue' },
+    { key: 'receipt' as DocumentType, label: 'Receipts', icon: Receipt, count: documents.filter(d => d.type === 'receipt').length, color: 'green' },
+    { key: 'bank-statement' as DocumentType, label: 'Bank Statements', icon: Landmark, count: documents.filter(d => d.type === 'bank-statement').length, color: 'indigo' }
+  ];
+
+  const getStatusBadge = (status: DocumentStatus) => {
+    const styles = {
+      pending: 'bg-amber-100 text-amber-800 border-amber-200',
+      processing: 'bg-blue-100 text-blue-800 border-blue-200',
+      verified: 'bg-green-100 text-green-800 border-green-200',
+      completed: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      flagged: 'bg-red-100 text-red-800 border-red-200'
+    };
+    return styles[status];
+  };
+
+  const handleSelectAll = () => {
+    const allSelected = documents.every(d => d.selected);
+    setDocuments(docs => docs.map(doc => ({ ...doc, selected: !allSelected })));
+  };
+
+  const handleSelectDocument = (id: string) => {
+    setDocuments(docs => docs.map(doc => doc.id === id ? { ...doc, selected: !doc.selected } : doc));
+  };
+
+  const filteredDocuments = documents.filter(doc => {
+    if (doc.status !== activeTab) return false;
+    if (selectedType !== 'all' && doc.type !== selectedType) return false;
+    if (searchQuery && !doc.vendor.toLowerCase().includes(searchQuery.toLowerCase()) && 
+        !doc.description.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
+  const selectedCount = documents.filter(d => d.selected).length;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-50 via-white to-purple-50">
+    <>
       <Navigation />
-      
-      <main className="flex-grow container mx-auto px-4 py-12">
-        <div className="max-w-5xl mx-auto">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              Document Scanner
-            </h1>
-            <p className="text-lg text-gray-600">
-              Upload your documents and extract data with AI-powered processing
-            </p>
+          <div className="mb-8">
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent">
+                  Document Management
+                </h1>
+                <p className="text-gray-600 mt-2 text-lg">Intelligent scanning for invoices, receipts & bank statements</p>
+              </div>
+              <button
+                onClick={() => setShowUploadModal(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <Upload className="h-5 w-5" />
+                Upload Documents
+              </button>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-4 gap-4 mt-6">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <div
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`bg-white rounded-xl p-4 border-2 cursor-pointer transition-all hover:shadow-md ${
+                      activeTab === tab.key 
+                        ? 'border-purple-500 shadow-md' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">{tab.label}</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{tab.count}</p>
+                      </div>
+                      <Icon className={`h-8 w-8 text-${tab.color}-500`} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Upload Section */}
-          {!result && (
-            <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
-              {/* Upload Mode Selector */}
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 text-center">Select Upload Mode</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <button
-                    onClick={() => {
-                      setUploadMode('single');
-                      setSelectedFile(null);
-                      setSelectedFiles([]);
-                      setResult(null);
-                    }}
-                    className={`p-6 rounded-xl border-2 transition-all duration-300 ${
-                      uploadMode === 'single'
-                        ? 'border-purple-600 bg-purple-50 shadow-lg'
-                        : 'border-gray-200 hover:border-purple-300 hover:bg-purple-25'
-                    }`}
-                  >
-                    <div className="flex flex-col items-center">
-                      <svg className="w-12 h-12 mb-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                      </svg>
-                      <h4 className="font-bold text-gray-900 mb-1">Single Upload</h4>
-                      <p className="text-sm text-gray-600 text-center">Upload one document at a time</p>
-                    </div>
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setUploadMode('bulk');
-                      setSelectedFile(null);
-                      setSelectedFiles([]);
-                      setResult(null);
-                    }}
-                    className={`p-6 rounded-xl border-2 transition-all duration-300 ${
-                      uploadMode === 'bulk'
-                        ? 'border-purple-600 bg-purple-50 shadow-lg'
-                        : 'border-gray-200 hover:border-purple-300 hover:bg-purple-25'
-                    }`}
-                  >
-                    <div className="flex flex-col items-center">
-                      <svg className="w-12 h-12 mb-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <h4 className="font-bold text-gray-900 mb-1">Bulk Upload</h4>
-                      <p className="text-sm text-gray-600 text-center">Upload multiple documents</p>
-                    </div>
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setUploadMode('bank-statement');
-                      setSelectedFile(null);
-                      setSelectedFiles([]);
-                      setResult(null);
-                    }}
-                    className={`p-6 rounded-xl border-2 transition-all duration-300 ${
-                      uploadMode === 'bank-statement'
-                        ? 'border-purple-600 bg-purple-50 shadow-lg'
-                        : 'border-gray-200 hover:border-purple-300 hover:bg-purple-25'
-                    }`}
-                  >
-                    <div className="flex flex-col items-center">
-                      <svg className="w-12 h-12 mb-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                      </svg>
-                      <h4 className="font-bold text-gray-900 mb-1">Bank Statement</h4>
-                      <p className="text-sm text-gray-600 text-center">Process bank statements</p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* File Upload Area */}
-              <div
-                className={`border-3 border-dashed rounded-xl p-12 text-center transition-all duration-300 ${
-                  isDragging
-                    ? 'border-purple-500 bg-purple-50 scale-105'
-                    : 'border-gray-300 hover:border-purple-400 hover:bg-gray-50'
-                }`}
-                onDragEnter={handleDragEnter}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={acceptedFormats.join(',')}
-                  onChange={handleFileInputChange}
-                  className="hidden"
-                  disabled={isProcessing}
-                  multiple={uploadMode === 'bulk'}
-                />
-
-                <div className="flex flex-col items-center">
-                  <svg
-                    className="w-20 h-20 text-purple-400 mb-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                    />
-                  </svg>
-
-                  {uploadMode === 'bulk' && selectedFiles.length > 0 ? (
-                    <div className="mb-6 max-w-md mx-auto">
-                      <p className="text-lg font-medium text-gray-900 mb-3">
-                        {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''} selected
-                      </p>
-                      <div className="max-h-40 overflow-y-auto space-y-2">
-                        {selectedFiles.map((file, index) => (
-                          <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                            <div className="flex-1 text-left">
-                              <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
-                              <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                            </div>
-                            <button
-                              onClick={() => removeFile(index)}
-                              className="ml-2 text-red-500 hover:text-red-700"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : selectedFile ? (
-                    <div className="mb-6">
-                      <p className="text-lg font-medium text-gray-900 mb-2">
-                        {selectedFile.name}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                      {uploadMode === 'bank-statement' && (
-                        <p className="text-sm text-purple-600 mt-2 font-medium">
-                          Processing as Bank Statement
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="mb-6">
-                      <p className="text-xl font-semibold text-gray-700 mb-2">
-                        {uploadMode === 'bulk' ? 'Drag and drop your files here' : 'Drag and drop your file here'}
-                      </p>
-                      <p className="text-gray-500">or</p>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isProcessing}
-                    className="px-8 py-4 bg-purple-600 text-white rounded-lg font-semibold text-lg hover:bg-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                  >
-                    {uploadMode === 'bulk' 
-                      ? (selectedFiles.length > 0 ? 'Add More Files' : 'Select Files')
-                      : (selectedFile ? 'Choose Different File' : 'Select File')
-                    }
-                  </button>
-
-                  <p className="text-sm text-gray-400 mt-6">
-                    Supported formats: PDF, DOCX, DOC, TXT, PNG, JPG, JPEG, GIF, BMP, TIFF, XLSX, XLS, CSV
-                  </p>
-                  <p className="text-xs text-gray-400 mt-2">Max file size: 50MB{uploadMode === 'bulk' ? ' per file' : ''}</p>
-                </div>
-              </div>
-
-              {/* Upload Button */}
-              {((uploadMode === 'bulk' && selectedFiles.length > 0) || (uploadMode !== 'bulk' && selectedFile)) && !isProcessing && (
-                <div className="mt-8 flex gap-4 justify-center">
-                  <button
-                    onClick={handleUpload}
-                    className="px-10 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-bold text-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105"
-                  >
-                    {uploadMode === 'bulk' 
-                      ? `Process ${selectedFiles.length} Document${selectedFiles.length > 1 ? 's' : ''}`
-                      : uploadMode === 'bank-statement'
-                      ? 'Process Bank Statement'
-                      : 'Process Document'
-                    }
-                  </button>
-                  <button
-                    onClick={handleReset}
-                    className="px-10 py-4 bg-gray-200 text-gray-700 rounded-lg font-bold text-lg hover:bg-gray-300 transition-all duration-300"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-
-              {/* Progress Bar */}
-              {isProcessing && (
-                <div className="mt-8 animate-fadeIn">
-                  <div className="mb-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-gray-700">{progress.message}</span>
-                      <span className="text-sm font-bold text-purple-600">{progress.percentage}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ease-out ${getStatusColor()} shadow-lg`}
-                        style={{ width: `${progress.percentage}%` }}
-                      >
-                        <div className="h-full w-full bg-white opacity-20 animate-pulse"></div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-center space-x-2 text-gray-600">
-                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span className="text-sm">Processing your document...</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Error Message */}
-              {error && (
-                <div className="mt-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg animate-fadeIn">
-                  <div className="flex items-start">
-                    <svg className="w-5 h-5 text-red-500 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                    <p className="text-red-700 font-medium">{error}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Results Section */}
-          {result && (
-            <div className="animate-fadeIn">
-              {/* Bulk Upload - Show Each File Separately */}
-              {result.mode === 'bulk' && result.documents ? (
-                <div className="space-y-6">
-                  {/* Process Another Document Button */}
-                  <div className="flex justify-end mb-6">
-                    <button
-                      onClick={handleReset}
-                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl"
-                    >
-                      Process Another Document
-                    </button>
-                  </div>
-
-                  {/* Summary Card */}
-                  <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl shadow-xl p-6 text-white">
-                    <h3 className="text-2xl font-bold mb-4">Bulk Processing Summary</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="bg-white/10 rounded-lg p-4">
-                        <p className="text-sm opacity-90">Total Files</p>
-                        <p className="text-3xl font-bold">{result.totalFiles}</p>
-                      </div>
-                      <div className="bg-white/10 rounded-lg p-4">
-                        <p className="text-sm opacity-90">Successful</p>
-                        <p className="text-3xl font-bold text-green-300">{result.summary.successfullyProcessed}</p>
-                      </div>
-                      <div className="bg-white/10 rounded-lg p-4">
-                        <p className="text-sm opacity-90">Failed</p>
-                        <p className="text-3xl font-bold text-red-300">{result.summary.failed}</p>
-                      </div>
-                      <div className="bg-white/10 rounded-lg p-4">
-                        <p className="text-sm opacity-90">Processing Time</p>
-                        <p className="text-2xl font-bold">{result.metadata.processingTime}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Individual File Results */}
-                  {result.documents.map((doc: any, index: number) => {
-                    const isExpanded = expandedBulkFiles.has(index);
-                    const currentView = getBulkFileView(index);
+          <div className="flex gap-6">
+            {/* Sidebar */}
+            <div className="w-72 flex-shrink-0">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 sticky top-8">
+                <h3 className="font-bold text-gray-900 mb-4 text-lg">Filter by Type</h3>
+                <div className="space-y-2">
+                  {documentTypes.map((type) => {
+                    const Icon = type.icon;
                     
                     return (
-                      <div key={index} className="bg-white rounded-2xl shadow-xl overflow-hidden">
-                        <div 
-                          className="bg-gradient-to-r from-purple-500 to-indigo-500 px-6 py-4 cursor-pointer hover:from-purple-600 hover:to-indigo-600 transition-all"
-                          onClick={() => toggleBulkFile(index)}
-                        >
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-3">
-                              <svg 
-                                className={`w-6 h-6 text-white transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                                fill="none" 
-                                stroke="currentColor" 
-                                viewBox="0 0 24 24"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
-                              <h4 className="text-xl font-bold text-white">
-                                Document {doc.index}: {doc.filename}
-                              </h4>
-                            </div>
-                            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                              doc.status === 'Success' 
-                                ? 'bg-green-500 text-white' 
-                                : 'bg-red-500 text-white'
-                            }`}>
-                              {doc.status}
-                            </span>
-                          </div>
+                      <button
+                        key={type.key}
+                        onClick={() => setSelectedType(type.key)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                          selectedType === type.key
+                            ? 'bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 font-semibold shadow-sm'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className={`p-2 rounded-lg ${selectedType === type.key ? 'bg-purple-200' : 'bg-gray-100'}`}>
+                          <Icon className="h-5 w-5" />
                         </div>
-                        
-                        <div className="p-6">
-                          {/* Summary Info - Always Visible */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                              <p className="text-sm text-gray-600">File Type</p>
-                              <p className="font-semibold text-gray-900">{doc.fileType}</p>
-                            </div>
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                              <p className="text-sm text-gray-600">Size</p>
-                              <p className="font-semibold text-gray-900">{doc.size}</p>
-                            </div>
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                              <p className="text-sm text-gray-600">Confidence</p>
-                              <p className="font-semibold text-gray-900">{(doc.extractedFields.confidence * 100).toFixed(1)}%</p>
-                            </div>
-                          </div>
-
-                          {/* Quick Summary */}
-                          <div className="bg-purple-50 p-4 rounded-lg mb-4">
-                            <h5 className="font-semibold text-purple-900 mb-2">Quick Summary</h5>
-                            <div className="space-y-2">
-                              <div className="flex justify-between">
-                                <span className="text-gray-700">Document Type:</span>
-                                <span className="font-medium text-gray-900">{doc.extractedFields.documentType}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-700">Key Data Points:</span>
-                                <span className="font-medium text-gray-900">{doc.extractedFields.keyDataPoints}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Expandable Detailed View */}
-                          {isExpanded && doc.detailedData && (
-                            <div className="animate-fadeIn">
-                              {/* View Toggle for this file */}
-                              <div className="flex justify-between items-center mb-4 pb-4 border-b">
-                                <div className="flex gap-3">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setBulkFileView(index, 'table');
-                                    }}
-                                    className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 text-sm ${
-                                      currentView === 'table'
-                                        ? 'bg-purple-600 text-white shadow-md'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
-                                  >
-                                    Table View
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setBulkFileView(index, 'json');
-                                    }}
-                                    className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 text-sm ${
-                                      currentView === 'json'
-                                        ? 'bg-purple-600 text-white shadow-md'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
-                                  >
-                                    JSON View
-                                  </button>
-                                </div>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      exportFileToCSV(doc.detailedData, doc.filename);
-                                    }}
-                                    className="px-3 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all duration-300 flex items-center gap-1 text-xs"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    CSV
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      exportFileToExcel(doc.detailedData, doc.filename);
-                                    }}
-                                    className="px-3 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-all duration-300 flex items-center gap-1 text-xs"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    Excel
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigator.clipboard.writeText(JSON.stringify(doc.detailedData, null, 2));
-                                      alert('Data copied to clipboard!');
-                                    }}
-                                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-300 flex items-center gap-1 text-xs"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                    </svg>
-                                    Copy
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Table View for this file */}
-                              {currentView === 'table' && (
-                                <div className="bg-gray-50 rounded-lg overflow-hidden">
-                                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                                    <table className="w-full">
-                                      <thead className="bg-purple-100 sticky top-0">
-                                        <tr>
-                                          <th className="py-3 px-4 text-left font-semibold text-purple-900 text-sm">Field</th>
-                                          <th className="py-3 px-4 text-left font-semibold text-purple-900 text-sm">Value</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {renderTableView(doc.detailedData)}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* JSON View for this file */}
-                              {currentView === 'json' && (
-                                <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto max-h-96 overflow-y-auto font-mono text-xs">
-                                  <div className="text-white">
-                                    {renderJsonValue(doc.detailedData, `file-${index}`, 0)}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Click to expand message */}
-                          {!isExpanded && (
-                            <div className="text-center py-2">
-                              <button 
-                                onClick={() => toggleBulkFile(index)}
-                                className="text-purple-600 hover:text-purple-700 font-medium text-sm"
-                              >
-                                Click to view detailed data ΓåÆ
-                              </button>
-                            </div>
-                          )}
+                        <div className="flex-1 text-left">
+                          <p className="text-sm font-medium">{type.label}</p>
                         </div>
-                      </div>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          selectedType === type.key 
+                            ? 'bg-purple-200 text-purple-700' 
+                            : 'bg-gray-200 text-gray-600'
+                        }`}>
+                          {type.count}
+                        </span>
+                      </button>
                     );
                   })}
+                </div>
+              </div>
+            </div>
 
-                  {/* Aggregated Data */}
-                  {result.aggregatedData && (
-                    <div className="bg-white rounded-2xl shadow-xl p-6">
-                      <h3 className="text-2xl font-bold text-gray-900 mb-4">Aggregated Analysis</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <h4 className="font-semibold text-purple-600 mb-3">Financial Summary</h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between border-b pb-2">
-                              <span className="text-gray-700">Total Amount:</span>
-                              <span className="font-bold text-gray-900">${result.aggregatedData.totalAmount.toFixed(2)}</span>
+            {/* Main Content */}
+            <div className="flex-1 min-w-0">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+                {/* Toolbar */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+                  <div className="flex items-center gap-3">
+                    {selectedCount > 0 && (
+                      <span className="text-sm font-medium text-gray-700 px-3 py-1 bg-purple-100 rounded-full">
+                        {selectedCount} selected
+                      </span>
+                    )}
+                    <button className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center gap-2">
+                      <Check className="h-4 w-4" />
+                      Approve
+                    </button>
+                    <button className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2">
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search documents..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent w-64"
+                      />
+                    </div>
+                    <button className="p-2 hover:bg-gray-100 rounded-lg border border-gray-300">
+                      <Filter className="h-5 w-5 text-gray-600" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-hidden overflow-y-auto" style={{maxHeight: 'calc(100vh - 400px)'}}>
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">
+                      <tr>
+                        <th className="w-12 px-6 py-4">
+                          <input
+                            type="checkbox"
+                            checked={documents.length > 0 && documents.every(d => d.selected)}
+                            onChange={handleSelectAll}
+                            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4"
+                          />
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Type</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Vendor</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Description</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Amount</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Confidence</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Date</th>
+                        <th className="w-12 px-6 py-4"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {filteredDocuments.map((doc) => (
+                        <tr
+                          key={doc.id}
+                          className={`hover:bg-purple-50 transition-colors ${doc.selected ? 'bg-purple-50 border-l-4 border-purple-500' : ''}`}
+                        >
+                          <td className="px-6 py-4">
+                            <input
+                              type="checkbox"
+                              checked={doc.selected}
+                              onChange={() => handleSelectDocument(doc.id)}
+                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4"
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(doc.status)}`}>
+                              {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              {doc.type === 'invoice' && <FileText className="h-4 w-4 text-blue-500" />}
+                              {doc.type === 'receipt' && <Receipt className="h-4 w-4 text-green-500" />}
+                              {doc.type === 'bank-statement' && <Landmark className="h-4 w-4 text-indigo-500" />}
+                              <span className="text-sm text-gray-600 capitalize">{doc.type.replace('-', ' ')}</span>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-700">Currency:</span>
-                              <span className="font-medium text-gray-900">{result.aggregatedData.currency}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-purple-600 mb-3">Document Types Breakdown</h4>
-                          <div className="space-y-2">
-                            {Object.entries(result.aggregatedData.documentTypes).map(([type, count]: [string, any]) => (
-                              <div key={type} className="flex justify-between">
-                                <span className="text-gray-700">{type}:</span>
-                                <span className="font-medium text-gray-900">{count}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-sm font-medium text-gray-900">{doc.vendor}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-sm text-gray-600 max-w-xs truncate">{doc.description}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-sm font-bold text-gray-900">{doc.currency} {doc.amount}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            {doc.confidence && (
+                              <div className="flex items-center gap-2">
+                                <div className="w-20 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className={`h-2 rounded-full ${
+                                      doc.confidence >= 95 ? 'bg-green-500' : 
+                                      doc.confidence >= 85 ? 'bg-amber-500' : 
+                                      'bg-red-500'
+                                    }`}
+                                    style={{ width: `${doc.confidence}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-xs font-medium text-gray-600">{doc.confidence}%</span>
                               </div>
-                            ))}
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-sm text-gray-600">{new Date(doc.uploadDate).toLocaleDateString()}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <button 
+                              onClick={() => {
+                                setSelectedDocument(doc);
+                                setShowResultModal(true);
+                              }}
+                              className="p-2 hover:bg-purple-100 rounded-lg text-purple-600 hover:text-purple-700"
+                              title="View Results"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {filteredDocuments.length === 0 && (
+                  <div className="text-center py-16">
+                    <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-xl font-medium text-gray-700 mb-2">
+                      {documents.length === 0 ? 'No documents uploaded yet' : 'No documents found'}
+                    </p>
+                    <p className="text-sm text-gray-500 mb-4">
+                      {documents.length === 0 
+                        ? 'Start by uploading your first document' 
+                        : 'Try adjusting your filters'}
+                    </p>
+                    {documents.length === 0 && (
+                      <button
+                        onClick={() => setShowUploadModal(true)}
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 font-medium shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
+                      >
+                        <Upload className="h-5 w-5" />
+                        Upload Documents
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden transform transition-all">
+            {/* Modal Header - Fixed */}
+            <div className="flex-shrink-0 px-8 pt-8 pb-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-3xl font-bold text-gray-900">Upload Documents</h2>
+                  <p className="text-gray-600 mt-1">Select upload mode and choose files</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowUploadModal(false);
+                    setIsUploading(false);
+                    setUploadProgress('');
+                    setUploadError('');
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-3xl leading-none"
+                  disabled={isUploading}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto px-8">
+
+            {/* Error Message */}
+            {uploadError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-red-900">Upload Failed</p>
+                  <p className="text-sm text-red-700 mt-1">{uploadError}</p>
+                </div>
+                <button
+                  onClick={() => setUploadError('')}
+                  className="ml-auto text-red-400 hover:text-red-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {uploadProgress && !uploadError && (
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <p className="text-sm font-medium text-green-900">{uploadProgress}</p>
+              </div>
+            )}
+
+            {/* Upload Mode Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">Upload Mode</label>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  onClick={() => setUploadMode('single')}
+                  disabled={isUploading}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    uploadMode === 'single'
+                      ? 'border-purple-600 bg-purple-50 shadow-lg'
+                      : 'border-gray-300 hover:border-purple-300'
+                  } ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <FileText className={`h-6 w-6 mx-auto mb-2 ${uploadMode === 'single' ? 'text-purple-600' : 'text-gray-400'}`} />
+                  <p className={`text-sm font-medium ${uploadMode === 'single' ? 'text-purple-900' : 'text-gray-700'}`}>Single</p>
+                  <p className="text-xs text-gray-500 mt-1">Invoice/Receipt</p>
+                </button>
+                <button
+                  onClick={() => setUploadMode('bulk')}
+                  disabled={isUploading}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    uploadMode === 'bulk'
+                      ? 'border-purple-600 bg-purple-50 shadow-lg'
+                      : 'border-gray-300 hover:border-purple-300'
+                  } ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <Receipt className={`h-6 w-6 mx-auto mb-2 ${uploadMode === 'bulk' ? 'text-purple-600' : 'text-gray-400'}`} />
+                  <p className={`text-sm font-medium ${uploadMode === 'bulk' ? 'text-purple-900' : 'text-gray-700'}`}>Bulk</p>
+                  <p className="text-xs text-gray-500 mt-1">Multiple files</p>
+                </button>
+                <button
+                  onClick={() => setUploadMode('bank-statement')}
+                  disabled={isUploading}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    uploadMode === 'bank-statement'
+                      ? 'border-purple-600 bg-purple-50 shadow-lg'
+                      : 'border-gray-300 hover:border-purple-300'
+                  } ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <Landmark className={`h-6 w-6 mx-auto mb-2 ${uploadMode === 'bank-statement' ? 'text-purple-600' : 'text-gray-400'}`} />
+                  <p className={`text-sm font-medium ${uploadMode === 'bank-statement' ? 'text-purple-900' : 'text-gray-700'}`}>Bank Statement</p>
+                  <p className="text-xs text-gray-500 mt-1">Account data</p>
+                </button>
+              </div>
+            </div>
+
+            {/* Document Type Selection (only for single mode) */}
+            {uploadMode === 'single' && (
+              <>
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Document Type</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => {
+                        const fileInput = document.getElementById('file-upload-invoice') as HTMLInputElement;
+                        if (fileInput) fileInput.click();
+                      }}
+                      disabled={isUploading}
+                      className={`p-4 rounded-xl border-2 border-gray-300 hover:border-purple-300 transition-all ${
+                        isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                      }`}
+                    >
+                      <FileText className="h-6 w-6 mx-auto mb-2 text-blue-500" />
+                      <p className="text-sm font-medium text-gray-700">Invoice</p>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const fileInput = document.getElementById('file-upload-receipt') as HTMLInputElement;
+                        if (fileInput) fileInput.click();
+                      }}
+                      disabled={isUploading}
+                      className={`p-4 rounded-xl border-2 border-gray-300 hover:border-purple-300 transition-all ${
+                        isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                      }`}
+                    >
+                      <Receipt className="h-6 w-6 mx-auto mb-2 text-green-500" />
+                      <p className="text-sm font-medium text-gray-700">Receipt</p>
+                    </button>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff"
+                    className="hidden"
+                    id="file-upload-invoice"
+                    onChange={(e) => handleFileUpload(e.target.files, 'invoice')}
+                    disabled={isUploading}
+                  />
+                  <input
+                    type="file"
+                    accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff"
+                    className="hidden"
+                    id="file-upload-receipt"
+                    onChange={(e) => handleFileUpload(e.target.files, 'receipt')}
+                    disabled={isUploading}
+                  />
+                </div>
+
+                {/* Supported File Types Info for Single Mode */}
+                <div className="mb-6 bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6 border border-purple-200">
+                  <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <Tag className="h-4 w-4 text-purple-600" />
+                    Supported File Types
+                  </h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                        <p className="text-xs font-semibold text-gray-700">📄 Documents</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-gray-600">• PDF</p>
+                        <p className="text-xs text-gray-600">• DOCX</p>
+                        <p className="text-xs text-gray-600">• DOC</p>
+                        <p className="text-xs text-gray-600">• TXT</p>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Image className="h-4 w-4 text-green-600" />
+                        <p className="text-xs font-semibold text-gray-700">🖼️ Images</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-gray-600">• PNG</p>
+                        <p className="text-xs text-gray-600">• JPG</p>
+                        <p className="text-xs text-gray-600">• JPEG</p>
+                        <p className="text-xs text-gray-600">• GIF</p>
+                        <p className="text-xs text-gray-600">• BMP</p>
+                        <p className="text-xs text-gray-600">• TIFF</p>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileSpreadsheet className="h-4 w-4 text-purple-600" />
+                        <p className="text-xs font-semibold text-gray-700">📊 Spreadsheets</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-gray-600">• XLSX</p>
+                        <p className="text-xs text-gray-600">• XLS</p>
+                        <p className="text-xs text-gray-600">• CSV</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-purple-200">
+                    <p className="text-xs text-gray-600">
+                      <span className="font-semibold">Max file size:</span> 10MB
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+            
+            {/* Supported File Types Info */}
+            {(uploadMode === 'bulk' || uploadMode === 'bank-statement') && (
+              <div className="mb-6 bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6 border border-purple-200">
+                <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Tag className="h-4 w-4 text-purple-600" />
+                  Supported File Types
+                </h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="h-4 w-4 text-blue-600" />
+                      <p className="text-xs font-semibold text-gray-700">📄 Documents</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-600">• PDF</p>
+                      <p className="text-xs text-gray-600">• DOCX</p>
+                      <p className="text-xs text-gray-600">• DOC</p>
+                      <p className="text-xs text-gray-600">• TXT</p>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Image className="h-4 w-4 text-green-600" />
+                      <p className="text-xs font-semibold text-gray-700">🖼️ Images</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-600">• PNG</p>
+                      <p className="text-xs text-gray-600">• JPG</p>
+                      <p className="text-xs text-gray-600">• JPEG</p>
+                      <p className="text-xs text-gray-600">• GIF</p>
+                      <p className="text-xs text-gray-600">• BMP</p>
+                      <p className="text-xs text-gray-600">• TIFF</p>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileSpreadsheet className="h-4 w-4 text-purple-600" />
+                      <p className="text-xs font-semibold text-gray-700">📊 Spreadsheets</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-600">• XLSX</p>
+                      <p className="text-xs text-gray-600">• XLS</p>
+                      <p className="text-xs text-gray-600">• CSV</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-purple-200">
+                  <p className="text-xs text-gray-600">
+                    <span className="font-semibold">Max file size:</span> {uploadMode === 'bank-statement' ? '20MB' : '10MB per file'}
+                    {uploadMode === 'bulk' && <span className="ml-2">• <span className="font-semibold">Max files:</span> 50</span>}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* File Upload Area (for bulk and bank-statement modes) */}
+            {(uploadMode === 'bulk' || uploadMode === 'bank-statement') && (
+              <div className="border-3 border-dashed border-purple-300 rounded-2xl p-12 text-center hover:border-purple-400 hover:bg-purple-50 transition-all cursor-pointer bg-gradient-to-br from-purple-50/50 to-white">
+                <Upload className="h-12 w-12 text-purple-400 mx-auto mb-3" />
+                <p className="text-lg font-semibold text-gray-900 mb-2">
+                  {isUploading ? 'Uploading...' : 'Drop your files here'}
+                </p>
+                <p className="text-sm text-gray-500 mb-4">
+                  {isUploading ? uploadProgress : 'or click to browse from your computer'}
+                </p>
+                <input
+                  type="file"
+                  multiple={uploadMode === 'bulk'}
+                  accept={uploadMode === 'bank-statement' ? '.pdf,.csv,.xlsx,.xls,.docx,.doc,.txt' : '.pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.xlsx,.xls,.csv'}
+                  className="hidden"
+                  id="file-upload-main"
+                  onChange={(e) => handleFileUpload(e.target.files)}
+                  disabled={isUploading}
+                />
+                <label
+                  htmlFor="file-upload-main"
+                  className={`mt-6 inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 font-medium shadow-lg hover:shadow-xl transform hover:scale-105 transition-all ${
+                    isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                  }`}
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    'Browse Files'
+                  )}
+                </label>
+              </div>
+            )}
+
+            </div>
+
+            {/* Modal Footer - Fixed */}
+            <div className="flex-shrink-0 px-8 py-6 border-t border-gray-200 bg-gray-50">
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowUploadModal(false);
+                    setIsUploading(false);
+                    setUploadProgress('');
+                  }}
+                  disabled={isUploading}
+                  className={`px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium ${
+                    isUploading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isUploading ? 'Uploading...' : 'Close'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Results Modal */}
+      {showResultModal && selectedDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full flex flex-col" style={{maxWidth: '72rem', maxHeight: 'calc(100vh - 2rem)'}}>
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-white flex-shrink-0">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  {selectedDocument.type === 'invoice' && <FileText className="h-6 w-6 text-blue-500" />}
+                  {selectedDocument.type === 'receipt' && <Receipt className="h-6 w-6 text-green-500" />}
+                  {selectedDocument.type === 'bank-statement' && <Landmark className="h-6 w-6 text-indigo-500" />}
+                  <span className="capitalize">{selectedDocument.type.replace('-', ' ')} Results</span>
+                </h2>
+                <p className="text-gray-600 text-sm mt-1">Vendor: {selectedDocument.vendor}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowResultModal(false);
+                  setSelectedDocument(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 text-3xl leading-none p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* View Toggle */}
+            <div className="flex gap-2 p-3 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+              <button
+                onClick={() => setResultView('table')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm ${
+                  resultView === 'table'
+                    ? 'bg-purple-600 text-white shadow-lg'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <FileText className="h-4 w-4" />
+                Table View
+              </button>
+              <button
+                onClick={() => setResultView('json')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm ${
+                  resultView === 'json'
+                    ? 'bg-purple-600 text-white shadow-lg'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <Code className="h-4 w-4" />
+                JSON View
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="overflow-y-auto p-4" style={{flex: '1 1 auto', minHeight: 0}}>
+              {resultView === 'table' ? (
+                <div className="space-y-6">
+                  {/* Receipt Table View */}
+                  {selectedDocument.type === 'receipt' && selectedDocument.extractedData && (
+                    <>
+                      <div className="bg-white rounded-lg border border-gray-200 p-6">
+                        <h3 className="text-xl font-bold text-gray-900 mb-4">Receipt Information</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-500">Receipt Number</p>
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.receiptNumber}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Store Name</p>
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.storeName}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Location</p>
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.location}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Date & Time</p>
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.date} {selectedDocument.extractedData.time}</p>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <>
-                  {/* View Toggle and Export Buttons for Single/Bank Statement */}
-                  <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-                    <div className="flex gap-4">
-                      <button
-                        onClick={() => setViewMode('table')}
-                        className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
-                          viewMode === 'table'
-                            ? 'bg-purple-600 text-white shadow-lg'
-                            : 'bg-white text-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        Table View
-                      </button>
-                      <button
-                        onClick={() => setViewMode('json')}
-                        className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
-                          viewMode === 'json'
-                            ? 'bg-purple-600 text-white shadow-lg'
-                            : 'bg-white text-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        JSON View
-                      </button>
-                    </div>
-                    
-                    <div className="flex gap-3">
-                      <button
-                        onClick={exportToCSV}
-                        className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        Export CSV
-                      </button>
-                      <button
-                        onClick={exportToExcel}
-                        className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        Export Excel
-                      </button>
-                      <button
-                        onClick={handleReset}
-                        className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl"
-                      >
-                        Process Another Document
-                      </button>
-                    </div>
-                  </div>
 
-                  {/* Table View */}
-                  {viewMode === 'table' && (
-                    <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-                      <div className="overflow-x-auto">
+                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <h3 className="text-xl font-bold text-gray-900 p-6 pb-4">Items</h3>
                         <table className="w-full">
-                          <thead className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
+                          <thead className="bg-gray-50">
                             <tr>
-                              <th className="py-4 px-6 text-left font-semibold text-lg">Field</th>
-                              <th className="py-4 px-6 text-left font-semibold text-lg">Value</th>
+                              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase">Item</th>
+                              <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase">Qty</th>
+                              <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase">Price</th>
+                              <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase">Total</th>
                             </tr>
                           </thead>
-                          <tbody>
-                            {renderTableView(result)}
+                          <tbody className="divide-y divide-gray-200">
+                            {selectedDocument.extractedData.items?.map((item: any, idx: number) => (
+                              <tr key={idx}>
+                                <td className="px-6 py-4 text-gray-900">{item.name}</td>
+                                <td className="px-6 py-4 text-right text-gray-900">{item.quantity}</td>
+                                <td className="px-6 py-4 text-right text-gray-900">${item.price.toFixed(2)}</td>
+                                <td className="px-6 py-4 text-right font-semibold text-gray-900">${item.total.toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-gray-50 font-bold">
+                            <tr>
+                              <td colSpan={3} className="px-6 py-3 text-right">Subtotal:</td>
+                              <td className="px-6 py-3 text-right">${selectedDocument.extractedData.subtotal.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                              <td colSpan={3} className="px-6 py-3 text-right">Tax:</td>
+                              <td className="px-6 py-3 text-right">${selectedDocument.extractedData.tax.toFixed(2)}</td>
+                            </tr>
+                            <tr className="text-lg text-purple-700">
+                              <td colSpan={3} className="px-6 py-3 text-right">Total:</td>
+                              <td className="px-6 py-3 text-right">${selectedDocument.extractedData.total.toFixed(2)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+
+                      <div className="bg-white rounded-lg border border-gray-200 p-6">
+                        <h3 className="text-xl font-bold text-gray-900 mb-4">Payment Information</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-500">Payment Method</p>
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.paymentMethod}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Card Last 4 Digits</p>
+                            <p className="font-semibold text-gray-900">****{selectedDocument.extractedData.cardLastFour}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Invoice Table View */}
+                  {selectedDocument.type === 'invoice' && selectedDocument.extractedData && (
+                    <>
+                      <div className="bg-white rounded-lg border border-gray-200 p-6">
+                        <h3 className="text-xl font-bold text-gray-900 mb-4">Invoice Information</h3>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-500">Invoice Number</p>
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.invoiceNumber}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Issue Date</p>
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.issueDate}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Due Date</p>
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.dueDate}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-6">
+                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                          <h3 className="text-lg font-bold text-gray-900 mb-4">Vendor Information</h3>
+                          <div className="space-y-2">
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.vendorInfo.name}</p>
+                            <p className="text-sm text-gray-600">{selectedDocument.extractedData.vendorInfo.address}</p>
+                            <p className="text-sm text-gray-600">Tax ID: {selectedDocument.extractedData.vendorInfo.taxId}</p>
+                            <p className="text-sm text-gray-600">{selectedDocument.extractedData.vendorInfo.email}</p>
+                          </div>
+                        </div>
+
+                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                          <h3 className="text-lg font-bold text-gray-900 mb-4">Customer Information</h3>
+                          <div className="space-y-2">
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.customerInfo.name}</p>
+                            <p className="text-sm text-gray-600">{selectedDocument.extractedData.customerInfo.address}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <h3 className="text-xl font-bold text-gray-900 p-6 pb-4">Line Items</h3>
+                        <table className="w-full">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase">Description</th>
+                              <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase">Qty</th>
+                              <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase">Unit Price</th>
+                              <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {selectedDocument.extractedData.lineItems?.map((item: any, idx: number) => (
+                              <tr key={idx}>
+                                <td className="px-6 py-4 text-gray-900">{item.description}</td>
+                                <td className="px-6 py-4 text-right text-gray-900">{item.quantity}</td>
+                                <td className="px-6 py-4 text-right text-gray-900">${item.unitPrice.toFixed(2)}</td>
+                                <td className="px-6 py-4 text-right font-semibold text-gray-900">${item.amount.toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-gray-50 font-bold">
+                            <tr>
+                              <td colSpan={3} className="px-6 py-3 text-right">Subtotal:</td>
+                              <td className="px-6 py-3 text-right">${selectedDocument.extractedData.subtotal.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                              <td colSpan={3} className="px-6 py-3 text-right">Tax:</td>
+                              <td className="px-6 py-3 text-right">${selectedDocument.extractedData.tax.toFixed(2)}</td>
+                            </tr>
+                            <tr className="text-lg text-purple-700">
+                              <td colSpan={3} className="px-6 py-3 text-right">Total:</td>
+                              <td className="px-6 py-3 text-right">${selectedDocument.extractedData.total.toFixed(2)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+
+                      <div className="bg-white rounded-lg border border-gray-200 p-6">
+                        <p className="text-sm text-gray-600">Payment Terms: <span className="font-semibold text-gray-900">{selectedDocument.extractedData.paymentTerms}</span></p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Bank Statement Table View */}
+                  {selectedDocument.type === 'bank-statement' && selectedDocument.extractedData && (
+                    <>
+                      <div className="bg-white rounded-lg border border-gray-200 p-6">
+                        <h3 className="text-xl font-bold text-gray-900 mb-4">Account Information</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-500">Account Holder</p>
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.accountHolder}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Account Number</p>
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.accountNumber}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Bank Name</p>
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.bankName}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Statement Period</p>
+                            <p className="font-semibold text-gray-900">{selectedDocument.extractedData.statementPeriod.from} to {selectedDocument.extractedData.statementPeriod.to}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200 p-6">
+                        <h3 className="text-xl font-bold text-gray-900 mb-4">Account Summary</h3>
+                        <div className="grid grid-cols-2 gap-6">
+                          <div>
+                            <p className="text-sm text-gray-600">Opening Balance</p>
+                            <p className="text-2xl font-bold text-gray-900">${selectedDocument.extractedData.openingBalance.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Closing Balance</p>
+                            <p className="text-2xl font-bold text-green-600">${selectedDocument.extractedData.closingBalance.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Total Deposits</p>
+                            <p className="text-xl font-bold text-green-600">+${selectedDocument.extractedData.totalDeposits.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Total Withdrawals</p>
+                            <p className="text-xl font-bold text-red-600">-${selectedDocument.extractedData.totalWithdrawals.toFixed(2)}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <h3 className="text-xl font-bold text-gray-900 p-6 pb-4">Transactions</h3>
+                        <table className="w-full">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase">Date</th>
+                              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase">Description</th>
+                              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase">Type</th>
+                              <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase">Amount</th>
+                              <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase">Balance</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {selectedDocument.extractedData.transactions?.map((txn: any, idx: number) => (
+                              <tr key={idx}>
+                                <td className="px-6 py-4 text-gray-900">{txn.date}</td>
+                                <td className="px-6 py-4 text-gray-900">{txn.description}</td>
+                                <td className="px-6 py-4">
+                                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                    txn.type === 'Credit' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                  }`}>
+                                    {txn.type}
+                                  </span>
+                                </td>
+                                <td className={`px-6 py-4 text-right font-semibold ${
+                                  txn.type === 'Credit' ? 'text-green-600' : 'text-red-600'
+                                }`}>
+                                  {txn.type === 'Credit' ? '+' : ''}{txn.amount.toFixed(2)}
+                                </td>
+                                <td className="px-6 py-4 text-right font-semibold text-gray-900">${txn.balance.toFixed(2)}</td>
+                              </tr>
+                            ))}
                           </tbody>
                         </table>
                       </div>
-                    </div>
+                    </>
                   )}
-
-                  {/* JSON View */}
-                  {viewMode === 'json' && (
-                    <div className="bg-white rounded-2xl shadow-xl p-8">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-xl font-bold text-gray-900">Raw JSON Output</h3>
-                        <button
-                          onClick={copyToClipboard}
-                          className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-all duration-300 flex items-center gap-2"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                          Copy JSON
-                        </button>
-                      </div>
-                      <div className="bg-gray-900 rounded-lg p-6 overflow-x-auto font-mono text-sm">
-                        <div className="text-white">
-                          {renderJsonValue(result, 'root', 0)}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
+                </div>
+              ) : (
+                <div className="bg-gray-900 rounded-lg p-6 overflow-x-auto">
+                  <pre className="text-green-400 text-sm font-mono">
+                    {JSON.stringify(selectedDocument.extractedData, null, 2)}
+                  </pre>
+                </div>
               )}
             </div>
-          )}
+
+            {/* Modal Footer */}
+            <div className="flex justify-between items-center gap-3 p-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+              <button
+                onClick={() => {
+                  setShowResultModal(false);
+                  setSelectedDocument(null);
+                }}
+                className="px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-white font-medium text-sm"
+              >
+                Close
+              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => {
+                    // Export CSV
+                    const data = selectedDocument.extractedData;
+                    let csvContent = '';
+                    
+                    if (selectedDocument.type === 'receipt' && data.items) {
+                      csvContent = 'Receipt Number,Store Name,Date,Item,Quantity,Price,Total\n';
+                      csvContent += `${data.receiptNumber},${data.storeName},${data.date},,,,\n`;
+                      data.items.forEach((item: any) => {
+                        csvContent += `,,${data.date},${item.name},${item.quantity},${item.price},${item.total}\n`;
+                      });
+                      csvContent += `,,,,Subtotal,,${data.subtotal}\n`;
+                      csvContent += `,,,,Tax,,${data.tax}\n`;
+                      csvContent += `,,,,Total,,${data.total}\n`;
+                    } else if (selectedDocument.type === 'invoice' && data.lineItems) {
+                      csvContent = 'Invoice Number,Vendor,Issue Date,Due Date,Description,Quantity,Unit Price,Amount\n';
+                      csvContent += `${data.invoiceNumber},${data.vendorInfo.name},${data.issueDate},${data.dueDate},,,,\n`;
+                      data.lineItems.forEach((item: any) => {
+                        csvContent += `,,,,${item.description},${item.quantity},${item.unitPrice},${item.amount}\n`;
+                      });
+                      csvContent += `,,,,Subtotal,,,${data.subtotal}\n`;
+                      csvContent += `,,,,Tax,,,${data.tax}\n`;
+                      csvContent += `,,,,Total,,,${data.total}\n`;
+                    } else if (selectedDocument.type === 'bank-statement' && data.transactions) {
+                      csvContent = 'Account Number,Account Holder,Bank,Date,Description,Type,Amount,Balance\n';
+                      data.transactions.forEach((txn: any) => {
+                        csvContent += `${data.accountNumber},${data.accountHolder},${data.bankName},${txn.date},${txn.description},${txn.type},${txn.amount},${txn.balance}\n`;
+                      });
+                      csvContent += `,,,,Opening Balance,,,${data.openingBalance}\n`;
+                      csvContent += `,,,,Closing Balance,,,${data.closingBalance}\n`;
+                    }
+                    
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `${selectedDocument.type}_${selectedDocument.id}_result.csv`);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium shadow-md flex items-center gap-2 text-sm"
+                >
+                  <Download className="h-4 w-4" />
+                  Export CSV
+                </button>
+                <button 
+                  onClick={() => {
+                    // Export Excel
+                    const data = selectedDocument.extractedData;
+                    let htmlContent = '<html><head><meta charset="UTF-8"><style>table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ddd;padding:8px;}th{background-color:#7c3aed;color:white;font-weight:bold;}</style></head><body><table>';
+                    
+                    if (selectedDocument.type === 'receipt' && data.items) {
+                      htmlContent += '<tr><th colspan="7">Receipt: ' + data.receiptNumber + ' - ' + data.storeName + '</th></tr>';
+                      htmlContent += '<tr><th>Date</th><th>Item</th><th>Quantity</th><th>Price</th><th>Total</th></tr>';
+                      data.items.forEach((item: any) => {
+                        htmlContent += `<tr><td>${data.date}</td><td>${item.name}</td><td>${item.quantity}</td><td>$${item.price}</td><td>$${item.total}</td></tr>`;
+                      });
+                      htmlContent += `<tr><td colspan="4" style="text-align:right;font-weight:bold;">Subtotal:</td><td>$${data.subtotal}</td></tr>`;
+                      htmlContent += `<tr><td colspan="4" style="text-align:right;font-weight:bold;">Tax:</td><td>$${data.tax}</td></tr>`;
+                      htmlContent += `<tr><td colspan="4" style="text-align:right;font-weight:bold;">Total:</td><td>$${data.total}</td></tr>`;
+                    } else if (selectedDocument.type === 'invoice' && data.lineItems) {
+                      htmlContent += '<tr><th colspan="5">Invoice: ' + data.invoiceNumber + ' - ' + data.vendorInfo.name + '</th></tr>';
+                      htmlContent += '<tr><th>Description</th><th>Quantity</th><th>Unit Price</th><th>Amount</th></tr>';
+                      data.lineItems.forEach((item: any) => {
+                        htmlContent += `<tr><td>${item.description}</td><td>${item.quantity}</td><td>$${item.unitPrice}</td><td>$${item.amount}</td></tr>`;
+                      });
+                      htmlContent += `<tr><td colspan="3" style="text-align:right;font-weight:bold;">Subtotal:</td><td>$${data.subtotal}</td></tr>`;
+                      htmlContent += `<tr><td colspan="3" style="text-align:right;font-weight:bold;">Tax:</td><td>$${data.tax}</td></tr>`;
+                      htmlContent += `<tr><td colspan="3" style="text-align:right;font-weight:bold;">Total:</td><td>$${data.total}</td></tr>`;
+                    } else if (selectedDocument.type === 'bank-statement' && data.transactions) {
+                      htmlContent += '<tr><th colspan="5">Bank Statement: ' + data.accountNumber + ' - ' + data.accountHolder + '</th></tr>';
+                      htmlContent += '<tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th><th>Balance</th></tr>';
+                      data.transactions.forEach((txn: any) => {
+                        htmlContent += `<tr><td>${txn.date}</td><td>${txn.description}</td><td>${txn.type}</td><td>$${txn.amount}</td><td>$${txn.balance}</td></tr>`;
+                      });
+                    }
+                    
+                    htmlContent += '</table></body></html>';
+                    const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel' });
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `${selectedDocument.type}_${selectedDocument.id}_result.xls`);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium shadow-md flex items-center gap-2 text-sm"
+                >
+                  <Download className="h-4 w-4" />
+                  Export Excel
+                </button>
+                <button 
+                  onClick={() => {
+                    const dataStr = JSON.stringify(selectedDocument.extractedData, null, 2);
+                    const blob = new Blob([dataStr], { type: 'application/json' });
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `${selectedDocument.type}_${selectedDocument.id}_result.json`);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium shadow-md flex items-center gap-2 text-sm"
+                >
+                  <Download className="h-4 w-4" />
+                  Export JSON
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </main>
+      )}
 
       <Footer />
-    </div>
+    </>
   );
 }
