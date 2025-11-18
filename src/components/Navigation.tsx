@@ -14,6 +14,11 @@ export default function Navigation({ currentPage = 'home' }: NavigationProps) {
   const [showResourcesMenu, setShowResourcesMenu] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Debug: Log authentication status
+  useEffect(() => {
+    console.log('Navigation - isAuthenticated:', isAuthenticated, 'user:', user);
+  }, [isAuthenticated, user]);
+
   // Close the dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -156,9 +161,9 @@ export default function Navigation({ currentPage = 'home' }: NavigationProps) {
                 </Link>
               </>
             ) : (
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-6">
                 {user && (
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
                       <span className="text-white text-sm font-medium">
                         {user.name.charAt(0).toUpperCase()}

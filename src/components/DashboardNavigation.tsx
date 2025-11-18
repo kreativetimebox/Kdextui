@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Brain, HomeIcon, BookOpen, DollarSign, Mail, Info, LayoutDashboard, LogOut, User, HelpCircle, Activity, ChevronDown } from "lucide-react";
+import { Brain, HomeIcon, BookOpen, DollarSign, Mail, Info, LayoutDashboard, LogOut, User, HelpCircle, Activity, ChevronDown, ScanLine } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 
@@ -40,9 +40,14 @@ export default function DashboardNavigation({ userName, userEmail }: DashboardNa
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
+      // Clear cached user data
+      sessionStorage.removeItem('user');
+      // Trigger auth change event
+      window.dispatchEvent(new Event('auth-change'));
       router.push('/');
     } catch (error) {
       console.error('Logout error:', error);
+      sessionStorage.removeItem('user');
       router.push('/');
     }
   };
@@ -51,6 +56,7 @@ export default function DashboardNavigation({ userName, userEmail }: DashboardNa
     { href: '/', label: 'Home', icon: HomeIcon },
     { href: '/docs', label: 'Documentation', icon: BookOpen },
     { href: '/pricing', label: 'Pricing', icon: DollarSign },
+    { href: '/scan', label: 'Scan', icon: ScanLine },
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, isActive: true },
   ];
 

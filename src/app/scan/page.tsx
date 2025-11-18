@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
-import { FileText, Receipt, Landmark, Upload, Search, Filter, Download, Trash2, Check, Clock, AlertCircle, CheckCircle2, MoreVertical, Tag, Eye, X, Code, Loader2, Image, FileSpreadsheet } from 'lucide-react';
+import { FileText, Receipt, Landmark, Upload, Search, Filter, Download, Archive, Check, Clock, AlertCircle, CheckCircle2, MoreVertical, Tag, Eye, X, Code, Loader2, Image, FileSpreadsheet } from 'lucide-react';
 
 type DocumentType = 'invoice' | 'receipt' | 'bank-statement';
 type DocumentStatus = 'pending' | 'processing' | 'verified' | 'completed' | 'flagged';
@@ -317,8 +317,8 @@ export default function ScanPage() {
                       Approve
                     </button>
                     <button className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2">
-                      <Trash2 className="h-4 w-4" />
-                      Delete
+                      <Archive className="h-4 w-4" />
+                      Archive
                     </button>
                   </div>
                   <div className="flex items-center gap-3">

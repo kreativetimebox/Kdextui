@@ -24,6 +24,9 @@ export default function DashboardPage() {
   useEffect(() => {
     // Fetch user data on component mount
     fetchUserData();
+    
+    // Trigger auth change event to update Navigation component
+    window.dispatchEvent(new Event('auth-change'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

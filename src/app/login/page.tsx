@@ -48,6 +48,10 @@ export default function LoginPage() {
       // Redirect to dashboard after a brief delay
       setTimeout(() => {
         router.push("/dashboard");
+        // Trigger auth change event after navigation to update Navigation
+        setTimeout(() => {
+          window.dispatchEvent(new Event('auth-change'));
+        }, 100);
       }, 1500);
     } catch (error) {
       console.error('Login error:', error);
